@@ -1,7 +1,7 @@
-use base64::prelude::*;
-use std::{fs::File, thread::sleep, time::Duration};
+use std::{fs::File, io::Cursor, thread::sleep, time::Duration};
 
 use serde_json::{json, Value};
+use image::ImageReader;
 
 fn main() {
     dotenvy::dotenv().unwrap();
@@ -93,13 +93,14 @@ fn main() {
                 let response = reqwest::blocking::get(image).unwrap();
 
                 let image_resp = response.status();
-                println!("{:?}", image_resp);
-
+                
                 buffer = response.bytes().unwrap();
-
+                
                 if image_resp == 200 {
+                    println!("we all good, lets continue");
                     break;
                 }
+                println!("response error: {:?}", image_resp);
                 if idx == 4 {
                     let bytes: Vec<u8> = vec![];
                     buffer = bytes.into();
@@ -110,7 +111,11 @@ fn main() {
             response.bytes().unwrap()
         };
 
-        let base_64 = BASE64_STANDARD.encode(bytes.as_ref());
+        let img = ImageReader::new(Cursor::new(bytes)).with_guessed_format().unwrap().decode().unwrap();
+
+        let file_name = format!("images/{}-{}.jpeg", urlencoding::encode(&title), urlencoding::encode(&artists));
+
+        img.save(&file_name).unwrap();
 
         let data = json!({
             "date_added": date_added,
@@ -120,7 +125,7 @@ fn main() {
             "genres": genres,
             "styles": styles,
             "formats": formats,
-            "image": format!("data:image/jpeg;base64,{}", base_64)
+            "image": file_name
         });
         output.push(data);
 
